@@ -1,0 +1,1027 @@
+import numpy as np
+import pandas as pd
+import datetime 
+from datetime import date
+import random
+import matplotlib.pyplot as plt
+import os
+import math
+
+
+# Неизменяемые данные
+month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JLY', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+model_name = "himical"       # имя модели
+startDate = date(2020, 1, 1) 
+n_month = 360
+
+Number_cases = 100 #количество генерируемых случаев
+
+dimX = 30; dimY = 30; dimZ = 30 # количество точек по осям
+
+diameter = 0.2 # Диаметр скважен
+P_top = 250 # начальное давление пласта на глубине скважены
+topDepth = 2000
+P_woc = 0 # 0.05 капилярное давление
+P_goc = 0 # 0.01 капиллярное давление на глубине газо-нефтяного контакта
+
+def gauss_list(min, max, Number_cases):
+    Gauss = [0.0008863697,	0.0015830903,	0.0027165938,	0.0044789061,	0.0070949186,	0.0107981933,	0.0157900317,	0.0221841669,	0.0299454931,	0.0388372110,	0.0483941449,	0.0579383106,	0.0666449206,	0.0736540281,	0.0782085388,	0.0797884561,	0.0782085388,	0.0736540281,	0.0666449206,	0.0579383106,	0.0483941449,	0.0388372110,	0.0299454931,	0.0221841669,	0.0157900317,	0.0107981933,	0.0070949186,	0.0044789061,	0.0027165938,	0.0015830903,	0.0008863697] 
+    for i in range (len(Gauss)):
+        Gauss[i] = math.ceil(Gauss[i] * Number_cases)
+
+    Size_list_X = []
+    Size_list_X_step = list(np.arange(min, max, (max-min)/len(Gauss))) 
+    Size_X = min
+
+    for i in range(len(Gauss)-1):
+        min = Size_list_X_step[i]
+        max = Size_list_X_step[i+1]
+        step_X = (Size_list_X_step[i+1]-Size_list_X_step[i])/Gauss[i]
+    
+        for j in range(Gauss[i]):
+            Size_X = Size_X + step_X
+            Size_list_X.append(Size_X) 
+
+    Gen_X = []
+
+    for n_c in range(int(Number_cases)):
+        rand_X = random.randint(0, len(Size_list_X)-1) 
+        Size_X = Size_list_X[rand_X] 
+        del Size_list_X[rand_X] 
+        Gen_X.append(round(Size_X, 7))
+
+    return Gen_X
+
+
+
+def uniform_list(min, max, Number_cases):
+    Size_list_X = list(np.arange(min, max, (max-min)/(Number_cases-1)))
+    Size_list_X.append(round(max, 7))
+    Gen_X =[]
+
+    for n_c in range(int(Number_cases)):
+        rand_X = random.randint(0, len(Size_list_X)-1) 
+        Size_X = Size_list_X[rand_X] 
+        del Size_list_X[rand_X] 
+        Gen_X.append(round(Size_X, 7))
+
+    return Gen_X
+
+
+
+def binary_list(min, max, Number_cases):
+    Gen_X = [min]*Number_cases 
+   
+    for n_c in range(int(Number_cases//2)):
+        Gen_X[n_c] = max 
+    random.shuffle(Gen_X)
+
+    return Gen_X
+
+
+
+# Параметры пласта
+
+
+
+# Генерация выборки с экспериментальными данными для ХМУН методом Латинского гиперкуба
+
+# 1 Размер рассматриваемой области в горизонтальном направлении вдоль наименьшей длины Xsize
+Xsize0 = uniform_list(100, 300, Number_cases)
+# 2 Отношение размера рассматриваемой области в горизонтальном направлении вдоль наибольшей длины к размеру рассматриваемой области в горизонтальном направлении вдоль наименьшей длины.
+Ysize0  = uniform_list(1, 2, Number_cases) 
+for i in range(len(Ysize0)):
+    Ysize0[i] = Ysize0[i]*Xsize0[i]
+# 3 Эффективная глубина пласта 
+Zsize0 = uniform_list(10, 50, Number_cases)  # изменено
+# 4 Пористость матрицы
+poro_matrix0 = uniform_list(0.1, 0.3, Number_cases)  
+# 5 Пористость трещин
+poro_crack0 = uniform_list(0.001, 0.003, Number_cases) 
+# 6 Анизотропия
+anisotropy0 = uniform_list(0.1, 1, Number_cases) 
+# 7 Давление насыщения
+pBub0 =  gauss_list(60, 150, Number_cases)  
+# 8 Отношение начального давления к давлению насыщения
+initPres_pBub0 = uniform_list(1.1, 3.4, Number_cases)  
+# 9 Проницаемость матрицы
+perm_matrix0 = uniform_list(0.1, 0.3, Number_cases)  
+# 10 Проницаемость трещин
+perm_crack0 = uniform_list(1, 250, Number_cases) 
+# 11 Температура пласта
+t_init0 = uniform_list(40, 120, Number_cases) 
+
+
+# Параметры, задающие PVT свойства
+
+# 12 Вязкость воды
+viscw0 = uniform_list(0.4, 1.8, Number_cases) #изм
+# 13 Сжимаемость породы
+comprr0 = uniform_list(0.00001, 0.00005, Number_cases)
+# 14 Сжимаемость воды
+comprw0 = uniform_list(0.0001, 0.0002, Number_cases)
+# 15 Сжимаемость нефти
+compro0 = uniform_list(0.00001, 0.0005, Number_cases)
+# 16 Плотность нефти
+denso0 = uniform_list(0.74, 0.94, Number_cases)
+# 17 Плотность воды
+densw0 = uniform_list(1, 1.2, Number_cases)  
+# 18 gf Газосодержание 
+gf0 = uniform_list(30, 300, Number_cases) 
+
+
+# Параметры скважин
+# 19 Объём закачки нагнетательной скважины в поверхностных условиях для четверти 5-точечной схемы [sm^3/day]
+injectionVolume0 = uniform_list(50, 150, Number_cases) 
+# 20 Давление на забое нагнетательной скважины
+prBottomholePressure0 = uniform_list(0.5, 1, Number_cases) 
+for i in range(len(prBottomholePressure0)):
+    prBottomholePressure0[i] = prBottomholePressure0[i]*pBub0[i]
+# 21 Давление на забое добывающей скважины
+initPressure0 = uniform_list(1.1, 3.4, Number_cases) 
+for i in range(len(initPressure0)):
+    initPressure0[i] = initPressure0[i]*pBub0[i]
+
+
+# Параметры химического заводнения
+# 22 Максимальная адсорбция полимера
+maxPolyAds0 =  uniform_list(0.00035, 0.0007, Number_cases) # изменено из-за сомнений в тз с 0 на 0.00005
+# 23 Мертвое поровое пространство
+deadPoreSpace0 = uniform_list(0.1, 0.4, Number_cases)
+# 24 Массовая плотность породы в пластовых условиях [кг/м3]
+massDensityRock0 = uniform_list(2000, 2700, Number_cases)
+# 25 Коэффициент остаточного сопротивления породы
+rockResistance0 = uniform_list(1, 30, Number_cases) 
+# 26 Индекс десорбции полимера
+polymerAdsIndice0 = binary_list(1, 2, Number_cases)
+# 27 Уменьшение сдвига полимера
+minimalShear0 = uniform_list(0.05, 0.2, Number_cases) 
+# 28 Концентрация полимера в потоке нагнетания
+polymerConc0 = uniform_list(1, 2.5, Number_cases) 
+# 29 Максимальная адсорбция ПАВ
+maxSurfads0 = uniform_list(0.0002, 0.002, Number_cases)   #изм
+# 30 Функция капиллярного разбавления
+surfCapd0 = uniform_list(-5, 5, Number_cases)
+# 31 Индекс десорбции ПАВ
+adsorbSurfIndice0 = binary_list(1, 2, Number_cases) 
+
+# 32 Концентрация ПАВ в потоке нагнетания
+surfConc0 = uniform_list(1, 8, Number_cases) 
+# 33 Максимальная адсорбция щелочи
+maxAlkAds0 = uniform_list(0.00002, 0.0002, Number_cases) #изм
+# 34 Коэффициент влияния на адсорбцию ПАВ
+maxAlkSurfad0 = uniform_list(0.25, 0.5, Number_cases) 
+# 35 Концентрация щелочи в потоке нагнетания
+alkalineConc0 = uniform_list(0, 25, Number_cases) 
+
+
+# Параметры ОФП 
+
+# 36 E_xw Параметр Кори для таблицы вода-нефть [scalar]. Степень по воде 
+E_xw0 = uniform_list(0.75, 5, Number_cases) 
+# 37 E_xo Параметр Кори для таблицы вода-нефть [scalar]. Степень по нефти
+E_xo0 = uniform_list(0.75, 5, Number_cases) 
+# 38 E_xwSurf Параметр Кори для таблицы ПАВ-нефть [scalar]. Степень по воде
+E_xwSurf0 = uniform_list(0.75, 5, Number_cases) 
+# 39 E_xoSurf Параметр Кори для таблицы ПАВ-нефть [scalar]. Степень по нефти 
+E_xoSurf0 = uniform_list(0.75, 5, Number_cases) 
+# 40 ОФП для нефти при критической водонасыщенности [scalar]
+KRORW0 = uniform_list(0.1, 0.8, Number_cases) 
+# 41 Максимальная ОФП для воды
+KRW0 = uniform_list(1, 2, Number_cases)  
+for i in range(len(KRW0)):
+    KRW0[i] = KRW0[i]*KRORW0[i]
+# 42 ОФП для воды при остаточной нефти
+KRWR0 = uniform_list(0.05, 0.5, Number_cases)   
+# 43 Критическая водонасыщенность
+SWCR0 = uniform_list(0.23, 0.46, Number_cases) 
+# 44 Критическая нефтенасыщенность по воде
+SOWCR0 = uniform_list(0.2, 0.4, Number_cases) 
+# 45 ОФП по газу при остаточной нефти
+KRGR0 = uniform_list(0.5, 0.9, Number_cases) 
+# 46 Максимальная ОФП по газу
+KRG0 = uniform_list(1, 1.1, Number_cases)  
+for i in range(len(KRG0)):
+    KRG0[i] = KRG0[i]*KRGR0[i]                  # Пока что генерация не по тз от Максима
+# 47 ОФП для нефти при критической газонасыщенности
+KRORG0 = uniform_list(0.2, 1, Number_cases) 
+# 48 Критическая газонасыщенность
+SGCR0 = uniform_list(0.001, 0.1, Number_cases) #изм
+# 49 Критическая нефтенасыщенность по газу
+SOGCR0 = uniform_list(0.025, 0.45, Number_cases)
+
+
+# Параметры, которые отсутствуют в ТЗ№2  
+
+# Размер нефтяной оторочки 
+oil_rim0 = uniform_list(0.43, 0.7, Number_cases) # изменено
+for i in range(len(oil_rim0)):
+    oil_rim0[i] = Zsize0[i]*oil_rim0[i]
+# Газосодержание
+Rs0 = uniform_list(50, 300, Number_cases)
+# Коэффициент объемного расширение нефти 
+bo0 = uniform_list(1.1, 1.7, Number_cases) 
+# Коэффициент объемного расширения воды
+bw0 = uniform_list(0.99, 1.01, Number_cases) 
+# Параметр Кори для ОФП
+S_or0 = uniform_list(0.05, 0.1995, Number_cases) # изменено
+# Максимальная ОФП для нефти
+KRO0 = uniform_list(0.8, 1, Number_cases) 
+
+for i in range(len(KRO0)):
+    if KRO0[i]<KRORG0[i]:
+        KRO0[i] = KRORG0[i]                  # Пока что генерация не по тз от Максима. Небольшой отход от гиперкуба
+# глубина перфорации
+perfDepth0 = uniform_list(0.5, 0.9, Number_cases) 
+for i in range(len(perfDepth0)):
+    perfDepth0[i] = round(perfDepth0[i]*oil_rim0[i], 7)
+# SWL = SWCR
+SWL0 = uniform_list(0.23, 0.46, Number_cases) 
+for i in range(len(SWL0)):
+    SWL0[i] = SWCR0[i]
+
+
+
+dx0 = [0]*Number_cases
+dy0 = [0]*Number_cases
+dz0 = [0]*Number_cases
+
+for i in range(len(Xsize0)):
+    dx0[i] = Xsize0[i]/dimX
+    dy0[i] = Ysize0[i]/dimY
+    dz0[i] = 2*Zsize0[i]/dimZ
+
+
+
+for n_c in range(int(Number_cases)):
+    # ГЕНЕРАЦИЯ КЕЙСОВ
+    print(n_c)
+    # Генерация случайных данных
+
+    # ВХОДНЫЕ ДАННЫЕ
+
+    dx = dx0[n_c] 
+    dy = dy0[n_c]
+    dz = dz0[n_c] 
+    oil_rim = oil_rim0[n_c] # оторочка нефтяная
+    l = (Zsize0[n_c]-oil_rim)/2 # Начало перфорации
+
+    # Характеристика расположения фаз (Вода - Нефть - Газ)
+
+    WOC_Depth = topDepth+l+oil_rim0[n_c] # глубина водо-нефтяного контакта (ВНК)
+    GOC_Depht = topDepth+l # Глубина газо-нефтяного контакта
+
+
+
+    # Задание параметров скважин
+
+    diam_PR_01 = diameter
+    diam_INJ = diameter
+
+
+
+    # физические параметры, часть дублируется
+    viscosibw = viscw0[n_c] # вязкость
+
+
+    perm_matrix = perm_matrix0[n_c]
+    perm_crack = perm_crack0[n_c]
+    poro_matrix = poro_matrix0[n_c]
+    poro_crack  = poro_crack0[n_c]
+
+
+    KRO = KRO0[n_c]
+    KRW = KRW0[n_c]
+    SWCR = SWCR0[n_c]
+    SOWCR = SOWCR0[n_c]
+    KRG = KRG0[n_c]
+    KRORG = KRORG0[n_c]
+    KRGR = KRGR0[n_c]
+    SGCR = SGCR0[n_c]
+    SOGCR = SOGCR0[n_c]
+    E_xw = E_xw0[n_c] 
+
+
+    S_wc = 0 #const
+    surfK_rw = 1 #const 
+    surfK_ro = 1 #const
+    ntsfun = 2 #число регионов фильтрации ???
+    ntpvt = 1 #количество PVT регионов ???
+    nssfun_nodes = 30 #максимальное количество различных насыщенностей, задаваемых в одной PVT таблце
+    nppvt_nodes = 20 #максимальное количество различных давлений 
+    ntfip = 1 #количество региогов, для которых необходимо выводить данные о запасах
+
+
+    reservoir_params = {"Xsize":Xsize0[n_c], "Ysize":Ysize0[n_c], "Zsize":Zsize0[n_c], "anisotropy":anisotropy0[n_c], "pDew":100, "pBub":pBub0[n_c], "initPres_pBub":initPres_pBub0[n_c]}
+    chemical_params = {"maxAlkAds":maxAlkAds0[n_c],  "maxAlkSurfad":maxAlkSurfad0[n_c], "maxSurfads":maxSurfads0[n_c], "adsorbSurfIndice":int(adsorbSurfIndice0[n_c]), "massDensityRock":massDensityRock0[n_c], \
+                  "k_rw":KRW0[n_c], "k_ro":KRO0[n_c], "SWL":SWL0[n_c], "maxPolyAds":maxPolyAds0[n_c], "deadPoreSpace":deadPoreSpace0[n_c], "rockResistance":rockResistance0[n_c], "polymerAdsIndice":int(polymerAdsIndice0[n_c]), \
+                  "minimalShear":minimalShear0[n_c], "S_or":S_or0[n_c], "E_xo":E_xo0[n_c], "polymerConc":polymerConc0[n_c], "alkalineConc":alkalineConc0[n_c], "surfConc":surfConc0[n_c]}
+    pvt_params = {"bo":bo0[n_c], "bw":bw0[n_c], "denso":denso0[n_c], "densw":densw0[n_c],"visco": 1.3, \
+                  "viscw":viscw0[n_c], "t_init":t_init0[n_c], "comprr":comprr0[n_c], "comprw":comprw0[n_c], "compro":compro0[n_c]}
+    well_params = {"mode":"VERTI", "perfDepth":perfDepth0[n_c] , "injectionVolume":injectionVolume0[n_c], "prBottomholePressure": prBottomholePressure0[n_c]}
+
+
+
+
+
+
+
+    # ГЕНЕРАЦИЯ ПАРАМЕТРОВ И DATA-ФАЙЛА
+     
+    def generate_PVT(bo, bw, denso, densw, visco, vicsw, gf, p_bubble, t_init, comprr, comprw, compro): 
+        props = np.array([bo, bw, denso, densw, visco, vicsw, gf, p_bubble, t_init]).reshape(1, -1)
+        props = pd.DataFrame(data=props, columns=['bo', 'bw', 'denso', 'densw', 'visco', 'viscw', 'gf', 'p_bubble', 't_init'])
+
+
+
+
+        #     Генерация начальных и остаточных нефтенасыщенностей
+        #     PVT-rock
+        rock = np.vstack([
+            props.p_bubble,
+            comprr,
+        ]).T
+
+
+        #     PVT-water
+        pvtw = np.vstack([
+            props.p_bubble,
+            props.bw,
+            comprw,
+            props.viscw,
+            viscosibw
+        ]).T
+
+
+        #     Генерация PVT Oil таблиц
+        compro = np.array(compro).reshape(-1, 1)
+        props['p_bubble_psia'] = props.p_bubble * 14.7
+        props['gamma_o'] = props.denso / props.densw
+        props['t_init_f'] = 9/5 * props.t_init + 32
+        props['gamma_g'] = 1.09373 * 0.0001 * np.power(props.gf, 0.5502) * np.power(props.gamma_o, 2.5486) \
+         * np.power(props.t_init_f + 460, 2.0967) / props.p_bubble_psia
+        props.gamma_g = np.power(props.gamma_g, 1/1.71956)
+
+        rss = np.arange(25) * 10 + 0.1
+        pbs = []
+        for rs in rss:
+            pbs.append(1.09373 * 0.0001 * np.power(rs, 0.5502) * np.power(props.gamma_o, 2.5486) \
+                       * np.power(props.t_init_f + 460, 2.0967) * np.power(props.gamma_g, -1.71956))
+        pbs = np.array(pbs) / 14.7
+        bobs = []
+
+        for rs in rss:
+            bobs.append(
+        0.99117 + 0.00021 * rs - 2.32*0.000001*rs*props.gamma_g/props.gamma_o-4.3*0.0000001*rs*(props.t_init_f-60)\
+        *(1 - props.gamma_o) + 0.00071*(props.t_init_f - 60)
+            )
+        bobs = np.array(bobs)
+        props['t_rel'] = (props.t_init_f + 459.67) / 459.67
+        mobs = []
+
+        for rs in rss:
+            mobs.append(
+        0.09*np.sqrt(props.gamma_g) / (np.power(rs, 1/3)*np.power(props.t_rel, 4.5)*np.power(1-props.gamma_o, 3))
+            )
+        mobs = np.array(mobs)
+        props['gamma_api'] = 141.5 / props.gamma_o - 131.5
+        cobs = []
+
+        for rs in rss:
+            cobs.append(
+        (-1433+5*rs+17.2*props.t_init_f-1180*props.gamma_g+12.61*props.gamma_api)/(props.p_bubble_psia*np.power(10,5))
+            )
+        cobs = np.array(cobs)
+        rss = np.array([rss]*1)
+        pvto = np.moveaxis(np.array([
+            rss,
+            pbs.T,
+            bobs.T,
+            mobs.T
+        ]), 0, -1)
+    
+        #     Плотности
+    
+        props['densg'] = props.gamma_g * props.densw
+        dens = props[['denso', 'densw', 'densg']].values
+        dens[:, :2] *= 1000   # плотность чего? немного влияет
+    
+    # Формирование выходного файла выборки:
+
+        samples = []
+        for i in range(1):
+            pvto_i = []
+            for pvto_row in pvto[i]:
+                p_ref = np.arange(pvto_row[1], 400, 10)[1:]
+                bo_unsat = pvto_row[2] * np.exp(compro[i]*(pvto_row[1]-p_ref))
+                visco_unsat = pvto_row[3]*0.9886 + (p_ref-pvto_row[1])*0.002763*(-0.01153*np.power(pvto_row[3],1.7933)+0.0316*np.power(pvto_row[3],1.5939))
+                visco_unsat[visco_unsat < pvto_row[3]] = pvto_row[3]
+                rs = np.ones_like(p_ref) * pvto_row[0]
+                visco_unsat = np.sort(visco_unsat, axis = None)
+                pvto_i_block = np.stack([rs, p_ref, bo_unsat, visco_unsat], axis=-1)
+                pvto_i.append(pvto_i_block)
+            pvto_i = np.vstack(pvto_i)
+            samples.append({ 
+                'gas_factor': props.gf[i],
+                'pvtw': pvtw[i], 
+                'pvto': pvto_i, 
+                'rock': rock[i], 
+                'dens': dens[i],
+            })
+        return samples
+
+    def build_chemical_case(model_name, reservoir_params, pvt_params, well_params, chemical_params):
+        Xsize = reservoir_params["Xsize"]
+        Ysize = reservoir_params["Ysize"]
+        Zsize = reservoir_params["Zsize"]
+        anisotropy = reservoir_params["anisotropy"]
+        pDew = reservoir_params["pDew"]
+        pBub = reservoir_params["pBub"]
+        initPres_pBub = reservoir_params["initPres_pBub"]
+        gf = gf0[n_c] #Газосодержание 
+        maxAlkAds = chemical_params["maxAlkAds"]
+        maxAlkSurfad = chemical_params["maxAlkSurfad"]
+        maxSurfads = chemical_params["maxSurfads"]
+        adsorbSurfIndice = chemical_params["adsorbSurfIndice"]
+        massDensityRock = chemical_params["massDensityRock"]
+        k_rw = chemical_params["k_rw"]
+        k_ro = chemical_params["k_ro"]
+        SWL = chemical_params["SWL"]
+        maxPolyAds = chemical_params["maxPolyAds"]
+        deadPoreSpace = chemical_params["deadPoreSpace"]
+        rockResistance = chemical_params["rockResistance"]
+        polymerAdsIndice = chemical_params["polymerAdsIndice"]
+        minimalShear = chemical_params["minimalShear"]
+        S_or = chemical_params["S_or"]
+        E_xo = chemical_params["E_xo"]
+        polymerConc = chemical_params["polymerConc"]
+        alkalineConc = chemical_params["alkalineConc"]
+        surfConc = chemical_params["surfConc"]
+        bo = pvt_params["bo"]
+        bw = pvt_params["bw"]
+        denso = pvt_params["denso"]
+        densw = pvt_params["densw"]
+        visco = pvt_params["visco"]
+        vicsw = pvt_params["viscw"]
+        t_init = pvt_params["t_init"]
+        comprr = pvt_params["comprr"]
+        comprw = pvt_params["comprw"]
+        compro = pvt_params["compro"]
+
+        #INITIAL FILE 
+        modelData = open(f"{model_name}/"f"{n_c}{model_name}.data", "w")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.runspec' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.grid' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.edit' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.props' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.regions' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.solution' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.summary' /\n")
+        modelData.write("INCLUDE\n")
+        modelData.write(f"'{n_c}{model_name}.schedule' /\n")
+        modelData.close()
+
+        #PVTGEN
+        PROPSparams = generate_PVT(bo, bw, denso, densw, visco, vicsw, gf, pBub, t_init, comprr, comprw, compro)[0]
+        rock = PROPSparams['rock']
+        pvtw = PROPSparams['pvtw']
+        pvto = PROPSparams['pvto']
+        dens = PROPSparams['dens']
+        pvdg = pd.read_csv("params/pvdg.csv", sep = " ", header = None)
+
+        #RUNSPEC SECTION
+        #RUNSPEC
+        modelRunspec = open(f"{model_name}/"f"{n_c}{model_name}.runspec", "w")
+        modelRunspec.write(f"RUNSPEC\n\nTITLE\n{model_name}\nOIL\nWATER\nGAS\nDISGAS\nDUALPERM\nPARALLEL\n4 DISTURBED  /\n")
+        modelRunspec.write(f"METRIC\n")
+        numBlocks = dimX * dimY * dimZ 
+        modelRunspec.write(f"DIMENS\n{dimX} {dimY} {dimZ} /\n")
+
+        listLabels = []
+        listParams = []
+        listParams2 = []
+        listParams3 = []
+        
+        listLabels.append('N')
+        listParams.append(n_c)
+        
+        listLabels.append('dimX'), listLabels.append('dimY'), listLabels.append('dimZ')
+        listParams.append(dimX), listParams.append(dimY), listParams.append(dimZ)
+
+
+
+        modelRunspec.write(f"EQLDIMS\n 1 /\n") #количество регионов равновесия
+        modelRunspec.write(f"AQUDIMS\n 1 /\n") #тут задаются параматеры аквиферы
+
+        modelRunspec.write(f"TABDIMS\n{ntsfun}\t{ntpvt}\t{nssfun_nodes}\t{nppvt_nodes}\t{ntfip}\t/\n")
+        start = f"{startDate.day} '{month[startDate.month - 1]}' {startDate.year}"
+        modelRunspec.write(f"START\n{start}/\n")
+        modelRunspec.write("SURFACT\nPOLYMER\nALKALINE\n")
+        modelRunspec.write(f"ENDSCALE\n'NODIR' 'REVERS' /\n")
+        modelRunspec.write(f"RUNCTRL\nDTMIN 1e-12\n/\n") # шаг по времени
+        modelRunspec.close()
+
+        #EDIT SECTION
+        modelEdit = open(f"{model_name}/"f"{n_c}{model_name}.edit", "w")
+        modelEdit.write(f"EDIT\n")
+        modelEdit.close()
+    
+ 
+        #GRID SECTION
+        modelGrid = open(f"{model_name}/"f"{n_c}{model_name}.grid", "w")
+        modelGrid.write(f"GRID\n")
+        modelGrid.write(f"EQUALS\n'DX'\t{dx} /\n'DY'\t{dy} /\n'DZ'\t{round(dz, 7)} /\n/\n")
+
+        listLabels.append('dx'), listLabels.append('dy'), listLabels.append('dz')
+        listParams.append(dx), listParams.append(dy), listParams.append(round(dz, 5))
+
+        modelGrid.write(f"TOPS\n") 
+        tops = f"{dimX*dimY}*{topDepth}" 
+        modelGrid.write(f"{tops}\n")     
+        modelGrid.write(f"/\n")
+
+        listLabels.append('topDepth')
+        listParams.append(topDepth)
+
+        actnum = 1  #???
+        modelGrid.write(f"EQUALS\n'ACTNUM'\t{actnum} /\n") #тут ещё разобрать
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"PORO\n") 
+
+
+        poroVolume = dimX * dimY * dimZ//2
+        modelGrid.write(f"{poroVolume}*{poro_matrix}\n")
+        modelGrid.write(f"{poroVolume}*{poro_crack}\n")
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"PERMX\n")
+        modelGrid.write(f"{poroVolume}*{perm_matrix}\n")
+        modelGrid.write(f"{poroVolume}*{perm_crack}\n")
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"PERMY\n")
+        modelGrid.write(f"{poroVolume}*{perm_matrix}\n")
+        modelGrid.write(f"{poroVolume}*{perm_crack}\n")
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"PERMZ\n")
+        modelGrid.write(f"{poroVolume}*{round(perm_matrix*anisotropy, 7)}\n")
+        modelGrid.write(f"{poroVolume}*{round(perm_crack*anisotropy, 7)}\n")
+        modelGrid.write(f"/\n")
+
+        listLabels.append('poro_matrix'), listLabels.append('poro_crack'), listLabels.append('perm_matrix'), listLabels.append('perm_crack')
+        listLabels.append('permZ_matrix'), listLabels.append('permZ_crack')
+        listParams.append(poro_matrix), listParams.append(poro_crack), listParams.append(perm_matrix), listParams.append(perm_crack)
+        listParams.append(round(perm_matrix*anisotropy, 7)), listParams.append(round(perm_crack*anisotropy, 7))
+
+        modelGrid.write(f"NODPPM\n")
+        modelGrid.write(f"DPGRID\n")
+
+        XT_size = round(dimX*dimY*dimZ//2 , 7)
+        SIGMAV = '*1.0000000000000000e-002'
+        SIGMAGDV = '*1.0000000000000001e-001'
+        modelGrid.write(f"SIGMAV\n")
+        modelGrid.write(f"{XT_size}{SIGMAV}\n")
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"SIGMAGDV\n")
+        modelGrid.write(f"{XT_size}{SIGMAGDV}\n")
+        modelGrid.write(f"/\n")
+        modelGrid.write(f"INIT\n")
+        modelGrid.close()
+        modelProps = open(f"{model_name}/"f"{n_c}{model_name}.props", "w")
+        modelProps.write("PROPS\n")
+
+        #ALKALINE
+        #ALKADS
+        baseAlkAds = 1.2422e-6 #const
+        alkadsTable = pd.read_csv("params/ALKADS.csv", header = None, sep = "\t", float_precision = "high")
+        temp = alkadsTable[1] / baseAlkAds * maxAlkAds
+        alkadsTable[1] = temp
+        modelProps.write("ALKADS\n")
+        for row in alkadsTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write("/\n/\n")
+
+        listLabels.append('maxAlkAds')
+        listParams.append(maxAlkAds)
+
+        #ALSURFAD
+        modelProps.write("ALSURFAD\n")
+        modelProps.write(f"0\t1.0\n20.18\t{maxAlkSurfad} /\n/\n")
+
+        listLabels.append('maxAlkSurfad')
+        listParams.append(maxAlkSurfad)
+
+        #ALKROCK
+        modelProps.write("ALKROCK\n")
+        modelProps.write(f"2 /\n/\n")
+
+        #SURFRACT
+        #SURFADS
+        surfadsTable = pd.read_csv("params/SURFADS.csv", header = None, sep = '\t')
+        temp = surfadsTable[1] / 9.52e-5 * maxSurfads
+        surfadsTable[1] = temp
+        modelProps.write("SURFADS\n")
+        for row in surfadsTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"//\n/\n")
+
+        listLabels.append('maxSurfads')
+        listParams.append(maxSurfads)
+
+
+        #SURFST
+        modelProps.write("SURFST\n")
+        surfstTable = pd.read_csv("params/SURFST.csv", header = None, sep = '\t')
+        for row in surfstTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"//\n/\n")
+
+        #SURFCAPD
+        modelProps.write("SURFCAPD\n")
+        surfcapdTable = pd.read_csv("params/SURFCAPD.csv", header = None, sep = '\t')
+        for row in surfcapdTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"/\n/\n")
+
+        #SURFROCK
+        modelProps.write("SURFROCK\n")
+        modelProps.write(f"{adsorbSurfIndice}\t{massDensityRock} /\n/\n")
+
+        listLabels.append('adsorbSurfIndice'), listLabels.append('massDensityRock')
+        listParams.append(adsorbSurfIndice), listParams.append(massDensityRock)
+
+        #POLYMER
+        #PLYVISC
+        modelProps.write("PLYVISC\n")
+        modelProps.write("0\t1.00\n")
+        maxPolyConc = 2 #const
+
+        mu_w = pvtw[3]
+        maxplyvisc = (k_rw * visco) / (k_ro * mu_w)
+        modelProps.write(f"{maxPolyConc}\t{round(maxplyvisc, 5)} / \n")
+
+        listLabels.append('maxplyvisc')
+        listParams.append(round(maxplyvisc, 5))
+
+        #PLYADS
+        modelProps.write("PLYADS\n")
+        plyadsTable = pd.read_csv("params/PLYADS.csv", header = None, sep = '\t')
+        temp = plyadsTable[1] / 3.0e-5 * maxPolyAds
+        plyadsTable[1] = temp
+        for row in plyadsTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"/\n/\n")
+
+        listLabels.append('maxPolyAds')
+        listParams.append(maxPolyAds)
+
+        #PLYROCK
+        modelProps.write("PLYROCK\n")
+        modelProps.write(f"{round(deadPoreSpace, 7)} {round(rockResistance, 7)} {round(massDensityRock, 7)} {round(polymerAdsIndice, 7)} {round(plyadsTable[1].values[-1], 7)} /\n")
+        modelProps.write(f"{round(deadPoreSpace, 7)} {round(rockResistance, 7)} {round(massDensityRock, 7)} {round(polymerAdsIndice, 7)} {round(plyadsTable[1].values[-1], 7)} /\n")
+        modelProps.write(f"/\n/\n")
+
+        listLabels.append('deadPoreSpace'), listLabels.append('rockResistance'), listLabels.append('massDensityRock'), listLabels.append('polymerAdsIndice')
+        listParams.append(round(deadPoreSpace, 7)), listParams.append(round(rockResistance, 7)), listParams.append(round(massDensityRock, 7))
+        listParams.append(round(polymerAdsIndice, 7))
+
+        #PLMIXPAR
+        modelProps.write("PLMIXPAR\n1 /\n")
+
+        #PLYMAX
+        modelProps.write("PLYMAX\n5.0 65.0 /\n")
+
+        #PLYSHEAR
+        modelProps.write("PLYSHEAR\n")
+        plyshearTable = pd.read_csv("params/PLYSHEAR.csv", header = None, sep = '\t')
+        plysher = np.linspace(1, minimalShear / 0.1, 9)
+        temp = plyshearTable[1] * plysher
+        plyshearTable[1] = temp 
+        for row in plyshearTable.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"/\n")
+
+        listLabels.append('minimalShear')
+        listParams.append(minimalShear)
+
+        modelProps.write(f"ROCK\n {str(rock)[1:-1]} /\n") #geomechanics
+        modelProps.write(f"DENSITY \n {str(dens)[1:-1]} /\n")
+
+        listLabels.append('p_bubble'), listLabels.append('comprr'), listLabels.append('denso'), listLabels.append('densw'), listLabels.append('densg')
+        listParams.append(rock[0]), listParams.append(rock[1]), listParams.append(dens[0]), listParams.append(dens[1]), listParams.append(dens[2])
+
+        modelProps.write("\nPVTW\n  " + str(pvtw)[1:-1] + " /\n\nPVTO\n")
+
+        listLabels.append('bw'), listLabels.append('comprw'), listLabels.append('viscw')#, listLabels.append('viscosibw')
+        listParams.append(pvtw[1]), listParams.append(pvtw[2]), listParams.append(pvtw[3])#, listParams.append(pvtw[4]), 
+
+        modelProps.write("  " + str(pvto[0])[1:-1])
+        rs_old = pvto[0, 0]
+        for row in pvto[1:]:
+            if row[0] == rs_old:
+                modelProps.write("\n     " + str(row[1:])[1:-1])
+            else:
+                rs_old = row[0]
+                modelProps.write(" /\n  " + str(row)[1:-1])
+        modelProps.write(" /\n/\n\nPVDG\n")
+        for row in pvdg.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write("/\n")
+
+        ############################# Оставшиеся параметры из PVT-таблиц
+        listLabels.append('bo'), listLabels.append('visco'), listLabels.append('gf'), listLabels.append('t_init'), listLabels.append('compro') 
+        listParams.append(bo), listParams.append(visco), listParams.append(gf), listParams.append(t_init), listParams.append(compro) 
+        
+
+        modelProps.write(f"SCALECRS\nYES/\n")
+        modelProps.write(f"SWOF\n")
+        swof = pd.read_csv("params/SWOF.csv", sep="\t", header=None)
+        del swof[4]
+        for row in swof.values:
+            row_ = str(row).replace("'", "") #it's kastyl, baby
+            modelProps.write(f"{row_[1:-1]}\n")
+        modelProps.write("/\n")
+
+        listLabels.append('S_or'), listLabels.append('E_xw'), listLabels.append('E_xo')
+        listParams.append(S_or), listParams.append(E_xw), listParams.append(E_xo)
+
+        surfTableS_w = np.linspace(0, 1, 11)  # что то сильно влияющее на дебиты, особенно воды
+        surfTableS_w[-2] = 1 - S_or
+        surfTableK_rw = surfK_rw * ((surfTableS_w - S_wc)/(1 - S_or - S_wc)) ** E_xw 
+        surfTableK_rw = surfTableK_rw * (surfTableK_rw < 1) + (surfTableK_rw >= 1)
+        surfTableK_ro = surfK_ro * ((1 - S_or - surfTableS_w) / (1 - S_or - S_wc)) 
+        surfTableK_ro *= (surfTableK_ro > 0) ** E_xo
+        for i in range(len(surfTableS_w)):
+            modelProps.write(f"{surfTableS_w[i]}\t{surfTableK_rw[i]}\t{abs(surfTableK_ro[i])}\t0\n")
+        modelProps.write(f"/\n")
+        modelProps.write(f"/\n")
+        modelProps.write(f"SGOF\n")
+        sgof = pd.read_csv("params/SGOF.csv", sep="\t", header=None)
+        for row in sgof.values:
+            modelProps.write(f"{str(row)[1:-1]}\n")
+        modelProps.write(f"/\n")
+        for i in range(len(surfTableS_w)):
+            modelProps.write(f"{surfTableS_w[i]}\t{surfTableK_rw[i]}\t{abs(surfTableK_ro[i])}\t0\n")
+        modelProps.write(f"/\n")
+        modelProps.write(f"/\n")
+    
+        #SCALING
+        modelProps.write(f"EQUALS\n")
+
+    
+        KRORW = k_ro
+        KRWR = k_rw
+        SGU = 1 - SWL # CONNECTED WITH SWL
+
+        modelProps.write(f"KRO {KRO}/\nKRORW {KRORW}/\nKRW {KRW}/\nKRWR {KRWR}/\nSWL {SWL}/\nSWCR {SWCR}/\nSOWCR {SOWCR}/\nKRG {KRG}/\n")
+        modelProps.write(f"KRORG {KRORG}/\nKRGR {KRGR}/\nSGCR {SGCR}/\nSOGCR {SOGCR}/\nSGU {SGU}\n")
+        modelProps.write(f"/\n")
+        modelProps.write("--------------------------------------------------\n")
+        modelProps.close()
+    
+        listLabels.append('KRO'), listLabels.append('KRORW'), listLabels.append('KRW'), listLabels.append('KRWR'), listLabels.append('SWL')
+        listLabels.append('SWCR'), listLabels.append('SOWCR'), listLabels.append('KRG'), listLabels.append('KRORG'), listLabels.append('KRGR')
+        listLabels.append('SGCR'), listLabels.append('SOGCR'), listLabels.append('SGU')
+        listParams.append(KRO), listParams.append(KRORW), listParams.append(KRW), listParams.append(KRWR), listParams.append(SWL)
+        listParams.append(SWCR), listParams.append(SOWCR), listParams.append(KRG), listParams.append(KRORG), listParams.append(KRGR)
+        listParams.append(SGCR), listParams.append(SOGCR), listParams.append(SGU)
+
+
+        #REGIONS SECTION
+        modelRegions = open(f"{model_name}/"f"{n_c}{model_name}.regions", "w")
+        modelRegions.write(f"REGIONS\n")
+        modelRegions.close()
+    
+        #SOLUTION SECTION
+        modelSolution = open(f"{model_name}/"f"{n_c}{model_name}.solution", "w")
+        modelSolution.write(f"SOLUTION\n")
+        modelSolution.write(f"EQUIL\n")
+        modelSolution.write(f"{topDepth} {P_top} {WOC_Depth} {P_woc} {GOC_Depht} {P_goc} 1 \n")
+        modelSolution.write(f"/\n")
+
+        listLabels.append('P_top'), listLabels.append('WOC_Depth'), listLabels.append('GOC_Depht')
+        listParams.append(P_top), listParams.append(WOC_Depth), listParams.append(GOC_Depht)
+
+        modelSolution.write(f"RSVD\n")
+        modelSolution.write(f"{topDepth-500} 60 \n")
+        modelSolution.write(f"{topDepth} 68 \n")
+        modelSolution.write(f"{topDepth+500} 73.5 \n")
+        modelSolution.write(f"/\n")
+        modelSolution.close()
+
+        #SUMMARY SECTION
+        modelSummary = open(f"{model_name}/"f"{n_c}{model_name}.summary", "w")
+        modelSummary.write(f"SUMMARY\n")
+        modelSummary.write(f"ALL\nSEPARATE\nEXCEL\nRUNSUM\nRPTONLY\n")
+        modelSummary.close()
+    
+        #SCHEDULE SECTION
+        well_mode = well_params["mode"] 
+        if well_mode == "HORIZ":
+            perfDepth = well_params["perfDepth"]
+            injectionVolume = well_params["injectionVolume"]
+            prBottomholePressure = well_params["prBottomholePressure"]
+            injHorizontal = well_params["injHorizontal"]
+            prHorizontal = well_params["prHorizontal"]
+        else:
+            perfDepth = well_params["perfDepth"]
+            injectionVolume = well_params["injectionVolume"]
+            prBottomholePressure = well_params["prBottomholePressure"]
+        modelSchedule = open(f"{model_name}/"f"{n_c}{model_name}.schedule", "w")
+        modelSchedule.write(f"SCHEDULE\n")
+        modelSchedule.write(f"RPTRST\n")
+        modelSchedule.write(f"'BASIC=2' 'FREQ=1'  /\n")
+        modelSchedule.write(f"GRUPTREE\n")
+        modelSchedule.write(f"'INJECT'  'FIELD'  /\n")
+        modelSchedule.write(f"'PRODUCE' 'FIELD'  /\n")
+        modelSchedule.write(f"/\n")
+        modelSchedule.write(f"WELSPECS\n")
+        PR_01_well_coords = (1, 1)         # первая скважина
+        inj_well_coords = (dimX-1, dimY-1)      # INJ скважина
+        modelSchedule.write(f"'INJ'    'INJECT'   {inj_well_coords[0]} {inj_well_coords[1]} 1* 'WATER'  /\n")
+        modelSchedule.write(f"'PR_01'  'PRODUCE'   {PR_01_well_coords[0]} {PR_01_well_coords[1]} 1* 'OIL'  /\n")
+        modelSchedule.write(f"/\n")
+
+
+        startPerf = (Zsize0[n_c] - perfDepth)/2
+        
+         #SET WELL TRACK  
+        modelSchedule.write(f"WELLTRACK\n")
+        if well_mode == "HORIZ":
+            modelSchedule.write(f"'INJ' {Xsize-dx} {Ysize-dy} {perfDepth} {perfDepth}\n")
+            modelSchedule.write(f"{int(Xsize-dx + injHorizontal[1] * np.cos(injHorizontal[0]))} {int(Ysize-dy + injHorizontal[1] * np.sin(injHorizontal[0]))} {perfDepth} {round(perfDepth + injHorizontal[1], 7)}")
+        else:
+            modelSchedule.write(f"'INJ' {Xsize-dx} {Ysize-dy} {topDepth} {0}\n")
+            modelSchedule.write(f"{Xsize-dx} {Ysize-dy} {perfDepth + topDepth + startPerf} {perfDepth + startPerf}\n")
+        modelSchedule.write(f"/\n")
+
+        listLabels.append('perfDepth')
+        listParams.append(perfDepth)
+
+        modelSchedule.write(f"WELLTRACK\n")
+        if well_mode == "HORIZ":
+            modelSchedule.write(f"'PR_01' {dx} {dy} {perfDepth} {perfDepth}\n")
+            modelSchedule.write(f"{int(0 + prHorizontal[1] * np.cos(prHorizontal[0]))} {int(0 + prHorizontal[1] * np.sin(prHorizontal[0]))} {perfDepth} {round(perfDepth + prHorizontal[1], 7)}")
+        else:
+            modelSchedule.write(f"'PR_01' {dx} {dy} {topDepth} {0}\n")
+            modelSchedule.write(f"{dx} {dy} {perfDepth + topDepth + startPerf} {perfDepth + startPerf}\n")
+        modelSchedule.write(f"/\n")
+
+
+        #SET PERFORATIONS
+        modelSchedule.write(f"COMPDATMD\n")
+        if well_mode == "HORIZ":
+            modelSchedule.write(f"'INJ' 1* {perfDepth} {perfDepth + injHorizontal[1]} 1* OPEN 2* {round(diam_INJ, 7)} 4* BOTH/\n")
+            modelSchedule.write(f"'PR_01' 1* {perfDepth} {perfDepth + prHorizontal[1]} 1* OPEN 2* {round(diam_PR_01, 7)} /\n")
+        else:
+            modelSchedule.write(f"'INJ' 1* {startPerf} {perfDepth + startPerf} 1* OPEN 2* {round(diam_INJ, 7)} 4* BOTH/\n")
+            modelSchedule.write(f"'PR_01' 1* {startPerf} {perfDepth + startPerf} 1* OPEN 2* {round(diam_PR_01, 7)} 4* BOTH/\n")
+        modelSchedule.write(f"/\n")
+
+        listLabels.append('diameter')
+        listParams.append(diam_INJ)
+
+        injBottomholePressureRestricion = 390 # const
+        currentDate = startDate
+        modelSchedule.write("DATES\n")
+        currentDate += datetime.timedelta(days=30)
+        modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+        modelSchedule.write("/\n")
+        modelSchedule.write(f"WCONINJE\n")
+        modelSchedule.write(f"'INJ' 'WATER' 'OPEN' 'RATE' {injectionVolume} 1* {injBottomholePressureRestricion} /\n")
+        modelSchedule.write(f"/\n")
+
+        listLabels.append('injectionVolume'), #listLabels.append('injBottomholePressureRestricion')
+        listParams.append(injectionVolume), #listParams.append(injBottomholePressureRestricion)
+
+        modelSchedule.write(f"WCONPROD\n")
+        modelSchedule.write(f"'PR_01' 'OPEN' 'BHP' 5* {prBottomholePressure} /\n")
+        modelSchedule.write(f"/\n")
+
+        listLabels.append('prBottomholePressure')
+        listParams.append(prBottomholePressure)
+
+        if (surfConc == 0 and alkalineConc > 0) or (polymerConc == 0):
+            print("Wrong concentration")
+        elif surfConc == 0 and alkalineConc == 0:
+            modelSchedule.write(f"WPOLYMER\n")
+            modelSchedule.write(f"'INJ' {polymerConc} /\n")
+            modelSchedule.write(f"/\n")
+            for i in range(int(n_month)):
+                modelSchedule.write("DATES\n")
+                currentDate += datetime.timedelta(days=30)
+                modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+                modelSchedule.write("/\n")
+                modelSchedule.write(f"WPOLYMER\n")
+                modelSchedule.write(f"'INJ' {polymerConc} /\n")
+                modelSchedule.write(f"/\n")
+            currentDate += datetime.timedelta(days=30)
+            modelSchedule.write("DATES\n")
+            modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+            modelSchedule.write("/\n")
+            modelSchedule.write(f"WPOLYMER\n")
+            modelSchedule.write(f"'INJ' {0} /\n")
+            modelSchedule.write(f"/\n")
+        else:
+            modelSchedule.write(f"WALKALINE\n")
+            modelSchedule.write(f"'INJ' {alkalineConc} /\n")
+            modelSchedule.write(f"/\n")
+            modelSchedule.write(f"WSURFACT\n")
+            modelSchedule.write(f"'INJ' {surfConc} /\n")
+            modelSchedule.write(f"/\n")
+            modelSchedule.write(f"WPOLYMER\n")
+            modelSchedule.write(f"'INJ' {polymerConc} /\n")
+            modelSchedule.write(f"/\n")
+            for i in range(int(n_month)):
+                modelSchedule.write("DATES\n")
+                currentDate += datetime.timedelta(days=30)
+                modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+                modelSchedule.write("/\n")
+                modelSchedule.write(f"WALKALINE\n")
+                modelSchedule.write(f"'INJ' {alkalineConc} /\n")
+                modelSchedule.write(f"/\n")
+                modelSchedule.write(f"WSURFACT\n")
+                modelSchedule.write(f"'INJ' {surfConc} /\n")
+                modelSchedule.write(f"/\n")
+                modelSchedule.write(f"WPOLYMER\n")
+                modelSchedule.write(f"'INJ' {polymerConc} /\n")
+                modelSchedule.write(f"/\n")
+            for i in range(int(n_month)):
+                modelSchedule.write("DATES\n")
+                currentDate += datetime.timedelta(days=30)
+                modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+                modelSchedule.write("/\n")
+                modelSchedule.write(f"WALKALINE\n")
+                modelSchedule.write(f"'INJ' {0} /\n")
+                modelSchedule.write(f"/\n")
+                modelSchedule.write(f"WSURFACT\n")
+                modelSchedule.write(f"'INJ' {0} /\n")
+                modelSchedule.write(f"/\n")
+                modelSchedule.write(f"WPOLYMER\n")
+                modelSchedule.write(f"'INJ' {polymerConc} /\n")
+                modelSchedule.write(f"/\n")
+            currentDate += datetime.timedelta(days=30)
+            modelSchedule.write("DATES\n")
+            modelSchedule.write(f"{currentDate.day} {month[currentDate.month - 1]} {currentDate.year}/\n")
+            modelSchedule.write("/\n")
+            modelSchedule.write(f"WPOLYMER\n")
+            modelSchedule.write(f"'INJ' {0} /\n")
+            modelSchedule.write(f"/\n")
+            modelSchedule.write(f"WSURFACT\n")
+            modelSchedule.write(f"'INJ' {0} /\n")
+            modelSchedule.write(f"/\n")
+            modelSchedule.write(f"WPOLYMER\n")
+            modelSchedule.write(f"'INJ' {0} /\n")
+            modelSchedule.write(f"/\n")
+
+
+        modelSchedule.write(f"TSTEP\n")
+        modelSchedule.write(f"{n_month}*30\n")
+        modelSchedule.write(f"/\n")
+        modelSchedule.write(f"END")
+        modelSchedule.close()
+
+
+
+
+        name = f"{model_name}/"f"{n_c}table.csv"
+
+        listParams2 = listParams
+        listParams3 = listParams 
+        
+        series0 = pd.Series(listLabels)
+        series1 = pd.Series(listParams)
+        series2 = pd.Series(listParams2)
+        series3 = pd.Series(listParams3)
+        
+        test0=pd.Series(['alkalineConc','surfConc','polymerConc'])
+        list0 = pd.concat([series0,test0],axis=0,ignore_index=True)
+
+        test1 = pd.Series([alkalineConc, surfConc, polymerConc])
+        list1 = pd.concat([series1, test1], axis=0,ignore_index=True)
+
+        test2 = pd.Series([0, 0, polymerConc])
+        list2 = pd.concat([series2, test2], axis=0, ignore_index=True)
+
+        test3 = pd.Series([0, 0, 0])
+        list3 = pd.concat([series3, test3], axis=0, ignore_index=True)
+
+        listOfSeries = []
+        listOfSeries.append(list0)
+        for i in range (1): ## n_month+1
+            listOfSeries.append(list1)
+
+        frame = pd.DataFrame(listOfSeries)
+        frame.to_csv(name, index=False, header=False)
+
+
+    build_chemical_case(model_name,reservoir_params, pvt_params, well_params, chemical_params)
+
+print('Расчетные пакеты успешно сгенерировались')
+
+#конец генерации кейсов
